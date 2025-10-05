@@ -4,7 +4,7 @@ import logging
 import os
 import asyncio
 from transform import transform_event
-from storage import write_to_dynamodb, write_to_s3
+from storage import write_to_dynamodb, write_to_s3, write_to_convex
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,13 +44,8 @@ async def run_consumer():
                 transformed = transform_event(data)
                 logger.info(f"Transformed event for match {transformed.get('match_id')}")
 
-                # Write to DynamoDB (live state)
-                await write_to_dynamodb(transformed)
-                logger.info(f"Written to DynamoDB: match {transformed.get('match_id')}")
-
-                # Write to S3 (historical snapshots)
-                await write_to_s3(transformed)
-                logger.info(f"Written to S3: match {transformed.get('match_id')}")
+                # Write to Convex (real-time dashboard)
+                await write_to_convex(transformed)
 
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to decode message: {e}")

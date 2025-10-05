@@ -41,6 +41,7 @@ export default defineSchema({
     utc_date: v.optional(v.string()),
     event_timestamp: v.optional(v.string()),
     processed_timestamp: v.string(),
+    producer_timestamp: v.optional(v.number()),
     event_type: v.string(),
   })
     .index("by_match_id", ["match_id"])

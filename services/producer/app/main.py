@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
 from producer import send_event, close_producer
 from api_client import fetch_epl_events
 

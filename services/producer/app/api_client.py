@@ -30,10 +30,17 @@ async def fetch_epl_events() -> List[Dict[str, Any]]:
 
     try:
         async with aiohttp.ClientSession() as session:
-            # Fetch matches for today
+            # Fetch matches from last 7 days (live and recent)
             url = f"{API_BASE_URL}/competitions/{EPL_COMPETITION_ID}/matches"
+
+            # Calculate date range
+            from datetime import datetime, timedelta
+            date_to = datetime.utcnow().strftime("%Y-%m-%d")
+            date_from = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+
             params = {
-                "status": "LIVE,IN_PLAY,PAUSED"  # Only get live matches
+                "dateFrom": date_from,
+                "dateTo": date_to
             }
 
             async with session.get(url, headers=headers, params=params) as response:

@@ -83,6 +83,7 @@ export const upsertMatch = mutation({
     utc_date: v.optional(v.string()),
     event_timestamp: v.optional(v.string()),
     processed_timestamp: v.string(),
+    producer_timestamp: v.optional(v.number()),
     event_type: v.string(),
   },
   handler: async (ctx, args) => {
