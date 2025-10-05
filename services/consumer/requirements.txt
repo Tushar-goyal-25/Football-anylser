@@ -1,0 +1,7 @@
+aiokafka==0.11.0
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# For production AWS integration (uncomment when needed)
+# aioboto3==13.2.0
+# boto3==1.35.36

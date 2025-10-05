@@ -1,0 +1,54 @@
+{
+  "family": "epl-consumer",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "consumer",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/epl-consumer:latest",
+      "essential": true,
+      "environment": [
+        {
+          "name": "KAFKA_BOOTSTRAP_SERVERS",
+          "value": "YOUR_MSK_BOOTSTRAP_SERVERS"
+        },
+        {
+          "name": "KAFKA_TOPIC",
+          "value": "epl.matches"
+        },
+        {
+          "name": "KAFKA_GROUP_ID",
+          "value": "epl-consumer-group"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "us-east-1"
+        },
+        {
+          "name": "DYNAMODB_TABLE",
+          "value": "epl-live-matches"
+        },
+        {
+          "name": "S3_BUCKET",
+          "value": "epl-match-snapshots"
+        },
+        {
+          "name": "USE_LOCAL_MOCK",
+          "value": "false"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/epl-consumer",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
