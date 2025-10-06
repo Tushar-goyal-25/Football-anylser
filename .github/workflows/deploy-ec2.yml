@@ -1,0 +1,155 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # Test and lint
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest flake8
+          pip install -r services/producer/requirements.txt
+          pip install -r services/consumer/requirements.txt
+
+      - name: Run linting
+        run: |
+          flake8 services/producer/app --count --select=E9,F63,F7,F82 --show-source --statistics || true
+          flake8 services/consumer/app --count --select=E9,F63,F7,F82 --show-source --statistics || true
+
+  # Deploy to EC2
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get EC2 instance IP
+        id: get-ip
+        run: |
+          INSTANCE_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=epl-live-server" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "instance_ip=$INSTANCE_IP" >> $GITHUB_OUTPUT
+          echo "EC2 Instance IP: $INSTANCE_IP"
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > /tmp/ec2-key.pem
+          chmod 400 /tmp/ec2-key.pem
+
+      - name: Copy services to EC2
+        run: |
+          # Create .ssh directory and disable strict host checking for CI
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ steps.get-ip.outputs.instance_ip }} >> ~/.ssh/known_hosts
+
+          # Copy producer service
+          rsync -avz -e "ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no" \
+            services/producer/ \
+            ec2-user@${{ steps.get-ip.outputs.instance_ip }}:/opt/epl-live/producer/
+
+          # Copy consumer service
+          rsync -avz -e "ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no" \
+            services/consumer/ \
+            ec2-user@${{ steps.get-ip.outputs.instance_ip }}:/opt/epl-live/consumer/
+
+      - name: Restart Docker containers on EC2
+        run: |
+          ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ steps.get-ip.outputs.instance_ip }} << 'EOF'
+            cd /opt/epl-live
+
+            # Pull latest images and rebuild
+            docker-compose down
+            docker-compose build --no-cache
+            docker-compose up -d
+
+            # Wait for services to be healthy
+            echo "Waiting for services to start..."
+            sleep 30
+
+            # Check status
+            docker-compose ps
+
+            # Show logs
+            echo "=== Recent logs ==="
+            docker-compose logs --tail=50
+          EOF
+
+      - name: Verify deployment
+        run: |
+          ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ steps.get-ip.outputs.instance_ip }} << 'EOF'
+            # Check if all containers are running
+            cd /opt/epl-live
+
+            RUNNING=$(docker-compose ps --services --filter "status=running" | wc -l)
+            TOTAL=$(docker-compose ps --services | wc -l)
+
+            echo "Running containers: $RUNNING/$TOTAL"
+
+            if [ "$RUNNING" -eq "$TOTAL" ]; then
+              echo "✅ All services are running successfully!"
+              exit 0
+            else
+              echo "❌ Some services failed to start"
+              docker-compose ps
+              docker-compose logs --tail=100
+              exit 1
+            fi
+          EOF
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f /tmp/ec2-key.pem
+
+  # Notify deployment status
+  notify:
+    name: Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+
+    steps:
+      - name: Deployment Success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "🎉 ✅ EC2 Deployment successful!"
+          echo "Services are running on EC2 instance"
+
+      - name: Deployment Failed
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ EC2 Deployment failed!"
+          echo "Check the logs above for details"
+          exit 1

@@ -8,6 +8,30 @@ import { MatchStats } from "../components/MatchStats";
 import { useState, useEffect } from "react";
 import { Sun, Moon, Search, Star } from "lucide-react";
 
+interface Match {
+  _id: string;
+  match_id: string;
+  home_team: {
+    name: string;
+    tla: string;
+  };
+  away_team: {
+    name: string;
+    tla: string;
+  };
+  score: {
+    home: number;
+    away: number;
+  };
+  status: string;
+  is_live: boolean;
+  utc_date?: string;
+  kpis?: {
+    total_goals: number;
+    leading_team: string;
+  };
+}
+
 export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -161,7 +185,7 @@ function LiveMatches() {
     );
   }
 
-  const filterMatches = (matches: any[]) => {
+  const filterMatches = (matches: Match[]) => {
     return matches.filter((match) => {
       const homeTeam = match.home_team.name.toLowerCase();
       const awayTeam = match.away_team.name.toLowerCase();
