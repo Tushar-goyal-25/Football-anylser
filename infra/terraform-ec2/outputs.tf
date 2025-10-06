@@ -87,27 +87,7 @@ output "useful_commands" {
 }
 
 output "cost_estimate" {
-  value = <<-EOT
-    Monthly Cost Estimate:
-    =====================
-    Instance Type: ${var.instance_type}
-
-    ${var.instance_type == "t3.micro" ? "FREE TIER (12 months for new accounts):" : "Cost Breakdown:"}
-    ${var.instance_type == "t3.micro" ? "- t3.micro: $0/month (750 hours free)" : "- ${var.instance_type}: ~$${var.instance_type == "t3.small" ? "15" : var.instance_type == "t3.medium" ? "30" : "?"}/month"}
-    - EBS Storage (20GB): $0/month (30GB free tier)
-    - Data Transfer: $0/month (100GB free tier)
-    - Elastic IP: $0/month (free when instance running)
-    =====================
-    ${var.instance_type == "t3.micro" ? "TOTAL: $0/month (first 12 months)" : "TOTAL: ~$${var.instance_type == "t3.small" ? "15" : var.instance_type == "t3.medium" ? "30" : "?"}/month"}
-
-    After Free Tier (if using t3.micro):
-    - t3.micro: ~$7/month
-
-    Recommended for Production: t3.small (~$15/month)
-    - More RAM (2GB vs 1GB)
-    - Better performance
-    - Still very affordable
-  EOT
+  value = var.instance_type == "t3.micro" ? "Monthly Cost Estimate:\n=====================\nInstance Type: t3.micro\n\nFREE TIER (12 months for new accounts):\n- t3.micro: $0/month (750 hours free)\n- EBS Storage (20GB): $0/month (30GB free tier)\n- Data Transfer: $0/month (100GB free tier)\n- Elastic IP: $0/month (free when instance running)\n=====================\nTOTAL: $0/month (first 12 months)\n\nAfter Free Tier:\n- t3.micro: ~$7/month\n\nRecommended for Production: t3.small (~$15/month)" : var.instance_type == "t3.small" ? "Monthly Cost Estimate:\n=====================\nInstance Type: t3.small\n\nCost Breakdown:\n- t3.small: ~$15/month\n- EBS Storage (20GB): ~$2/month\n- Data Transfer: $0/month (100GB free tier)\n- Elastic IP: $0/month (free when instance running)\n=====================\nTOTAL: ~$17/month\n\nGreat choice for production!\n- 2GB RAM (vs 1GB on t3.micro)\n- Better performance\n- Still very affordable" : "Monthly Cost Estimate:\n=====================\nInstance Type: ${var.instance_type}\n\nCost Breakdown:\n- ${var.instance_type}: ~$30/month (estimated)\n- EBS Storage (20GB): ~$2/month\n- Data Transfer: $0/month (100GB free tier)\n- Elastic IP: $0/month (free when instance running)\n=====================\nTOTAL: ~$32/month (estimated)"
   description = "Cost estimate breakdown"
 }
 

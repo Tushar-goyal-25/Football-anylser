@@ -104,19 +104,6 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role  = aws_iam_role.ec2_role[0].name
 }
 
-# User data script
-data "template_file" "user_data" {
-  template = file("${path.module}/user-data.sh")
-
-  vars = {
-    football_api_key   = var.football_api_key
-    convex_url         = var.convex_url
-    convex_deploy_key  = var.convex_deploy_key
-    enable_mock_data   = var.enable_mock_data
-    project_name       = var.project_name
-  }
-}
-
 # EC2 Instance
 resource "aws_instance" "epl_server" {
   ami           = data.aws_ami.amazon_linux_2023.id
@@ -126,12 +113,18 @@ resource "aws_instance" "epl_server" {
   vpc_security_group_ids = [aws_security_group.epl_instance.id]
   iam_instance_profile   = var.enable_cloudwatch_logs ? aws_iam_instance_profile.ec2_profile[0].name : null
 
-  user_data = data.template_file.user_data.rendered
+  user_data = templatefile("${path.module}/user-data.sh", {
+    football_api_key  = var.football_api_key
+    convex_url        = var.convex_url
+    convex_deploy_key = var.convex_deploy_key
+    enable_mock_data  = var.enable_mock_data
+    project_name      = var.project_name
+  })
 
   # Root volume configuration
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = 20 # GB (free tier: 30GB)
+    volume_size           = 30 # GB (free tier: 30GB, required for Amazon Linux 2023 AMI)
     delete_on_termination = true
     encrypted             = true
 

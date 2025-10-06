@@ -110,8 +110,8 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=epl.matches
       - REDIS_URL=redis://redis:6379
-      - FOOTBALL_API_KEY=${FOOTBALL_API_KEY}
-      - ENABLE_MOCK_DATA=${ENABLE_MOCK_DATA:-false}
+      - FOOTBALL_API_KEY=$${FOOTBALL_API_KEY}
+      - ENABLE_MOCK_DATA=$${ENABLE_MOCK_DATA:-false}
     working_dir: /app
     volumes:
       - ./producer:/app
@@ -134,8 +134,8 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=epl.matches
       - KAFKA_GROUP_ID=epl-consumer-group
-      - CONVEX_URL=${CONVEX_URL}
-      - CONVEX_DEPLOY_KEY=${CONVEX_DEPLOY_KEY}
+      - CONVEX_URL=$${CONVEX_URL}
+      - CONVEX_DEPLOY_KEY=$${CONVEX_DEPLOY_KEY}
     working_dir: /app
     volumes:
       - ./consumer:/app
