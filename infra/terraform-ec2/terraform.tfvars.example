@@ -1,0 +1,28 @@
+# EPL Live - Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region   = "us-east-1"
+environment  = "production"
+project_name = "epl-live"
+
+# EC2 Configuration
+instance_type = "t3.small"  # Options: t3.micro (free tier), t3.small (recommended), t3.medium
+
+# SSH Key (must exist in AWS)
+ssh_key_name = "epl-live-key"
+
+# Security: Restrict SSH to your IP
+# Find your IP: curl ifconfig.me
+allowed_ssh_cidr = ["0.0.0.0/0"]  # CHANGE THIS to ["YOUR_IP/32"] for security
+
+# Application Secrets
+football_api_key  = "your-football-data-api-key-here"
+convex_url        = "https://your-convex-deployment.convex.cloud"
+convex_deploy_key = ""  # Optional
+
+# Application Configuration
+enable_mock_data = false
+
+# Monitoring (costs extra)
+enable_cloudwatch_logs = false
