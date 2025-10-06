@@ -23,10 +23,14 @@ export const getAllMatches = query({
   handler: async (ctx) => {
     const matches = await ctx.db
       .query("matches")
-      .order("desc")
-      .take(50);
+      .collect();
 
-    return matches;
+    // Sort by UTC date descending (most recent first)
+    return matches.sort((a, b) => {
+      const dateA = a.utc_date ? new Date(a.utc_date).getTime() : 0;
+      const dateB = b.utc_date ? new Date(b.utc_date).getTime() : 0;
+      return dateB - dateA;
+    });
   },
 });
 

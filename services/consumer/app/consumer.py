@@ -38,11 +38,10 @@ async def run_consumer():
 
                 # Parse message
                 data = msg.value
-                logger.debug(f"Message data: {data}")
 
                 # Transform event
                 transformed = transform_event(data)
-                logger.info(f"Transformed event for match {transformed.get('match_id')}")
+                logger.info(f"Processing match {transformed.get('match_id')}: {transformed.get('home_team', {}).get('name')} vs {transformed.get('away_team', {}).get('name')} ({transformed.get('score', {}).get('home')}-{transformed.get('score', {}).get('away')})")
 
                 # Write to Convex (real-time dashboard)
                 await write_to_convex(transformed)

@@ -59,6 +59,19 @@ services:
     networks:
       - epl-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: epl-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - epl-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   producer:
     build:
       context: ../services/producer
@@ -67,10 +80,14 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=epl.matches
       - FOOTBALL_API_KEY=${FOOTBALL_API_KEY:-}
+      - ENABLE_MOCK_DATA=${ENABLE_MOCK_DATA:-false}
+      - REDIS_URL=redis://redis:6379
     ports:
       - "8000:8000"
     networks:

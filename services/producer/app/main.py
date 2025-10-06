@@ -53,7 +53,8 @@ async def poll_and_send():
         except Exception as e:
             logger.error(f"Error in poll_and_send: {e}", exc_info=True)
 
-        await asyncio.sleep(5)
+        # API limit: 10 calls/minute (free tier) = 1 call every 6 seconds
+        await asyncio.sleep(6)
 
 @app.get("/health")
 async def health_check():

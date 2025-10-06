@@ -5,8 +5,27 @@ import { api } from "../convex/_generated/api";
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import { MatchCard } from "../components/MatchCard";
 import { MatchStats } from "../components/MatchStats";
+import { useState, useEffect } from "react";
+import { Sun, Moon, Search, Star } from "lucide-react";
 
 export default function Home() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDarkMode]);
+
+  // Check system preference on mount
+  useEffect(() => {
+    const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    setIsDarkMode(darkModeQuery.matches);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Header */}
@@ -27,7 +46,15 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            <UserButton afterSignOutUrl="/" />
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <UserButton />
           </div>
         </div>
       </header>
@@ -73,9 +100,55 @@ function SignInPrompt() {
   );
 }
 
+function SearchAndFilters({
+  searchQuery,
+  setSearchQuery,
+  showFavoritesOnly,
+  setShowFavoritesOnly,
+  favoriteTeams,
+}: {
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  showFavoritesOnly: boolean;
+  setShowFavoritesOnly: (show: boolean) => void;
+  favoriteTeams: string[];
+}) {
+  return (
+    <div className="mb-6 flex flex-col md:flex-row gap-4">
+      {/* Search Bar */}
+      <div className="flex-1 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+        <input
+          type="text"
+          placeholder="Search teams..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+      </div>
+
+      {/* Favorites Filter */}
+      <button
+        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+        className={`px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 ${
+          showFavoritesOnly
+            ? "bg-primary text-white"
+            : "bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600"
+        }`}
+      >
+        <Star size={18} className={showFavoritesOnly ? "fill-white" : ""} />
+        Favorites {favoriteTeams.length > 0 && `(${favoriteTeams.length})`}
+      </button>
+    </div>
+  );
+}
+
 function LiveMatches() {
   const liveMatches = useQuery(api.matches.getLiveMatches);
   const recentMatches = useQuery(api.matches.getAllMatches);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [favoriteTeams, setFavoriteTeams] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   if (liveMatches === undefined || recentMatches === undefined) {
     return (
@@ -88,10 +161,63 @@ function LiveMatches() {
     );
   }
 
-  const hasLive = liveMatches.length > 0;
-  const hasRecent = recentMatches.length > 0;
+  const filterMatches = (matches: any[]) => {
+    return matches.filter((match) => {
+      const homeTeam = match.home_team.name.toLowerCase();
+      const awayTeam = match.away_team.name.toLowerCase();
+      const query = searchQuery.toLowerCase();
 
-  if (!hasLive && !hasRecent) {
+      const matchesSearch =
+        homeTeam.includes(query) ||
+        awayTeam.includes(query) ||
+        match.home_team.tla.toLowerCase().includes(query) ||
+        match.away_team.tla.toLowerCase().includes(query);
+
+      const matchesFavorites = !showFavoritesOnly ||
+        favoriteTeams.includes(match.home_team.name) ||
+        favoriteTeams.includes(match.away_team.name);
+
+      return matchesSearch && matchesFavorites;
+    });
+  };
+
+  const filteredLiveMatches = filterMatches(liveMatches);
+  const filteredRecentMatches = filterMatches(recentMatches);
+
+  const hasLive = filteredLiveMatches.length > 0;
+  const hasRecent = filteredRecentMatches.length > 0;
+
+  const toggleFavoriteTeam = (teamName: string) => {
+    setFavoriteTeams((prev) =>
+      prev.includes(teamName)
+        ? prev.filter((t) => t !== teamName)
+        : [...prev, teamName]
+    );
+  };
+
+  if (!hasLive && !hasRecent && (searchQuery || showFavoritesOnly)) {
+    return (
+      <>
+        <SearchAndFilters
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          showFavoritesOnly={showFavoritesOnly}
+          setShowFavoritesOnly={setShowFavoritesOnly}
+          favoriteTeams={favoriteTeams}
+        />
+        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+          <p className="text-slate-600 dark:text-slate-400 mb-2">
+            No matches found
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-500">
+            Try adjusting your search or filters
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  if (liveMatches.length === 0 && recentMatches.length === 0) {
     return (
       <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         <p className="text-slate-600 dark:text-slate-400 mb-2">
@@ -106,6 +232,15 @@ function LiveMatches() {
 
   return (
     <div className="space-y-8">
+      {/* Search and Filters */}
+      <SearchAndFilters
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        showFavoritesOnly={showFavoritesOnly}
+        setShowFavoritesOnly={setShowFavoritesOnly}
+        favoriteTeams={favoriteTeams}
+      />
+
       {/* Live Matches Section */}
       {hasLive && (
         <section>
@@ -113,8 +248,13 @@ function LiveMatches() {
             🔴 Live Matches
           </h2>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {liveMatches.map((match) => (
-              <MatchCard key={match._id} match={match} />
+            {filteredLiveMatches.map((match) => (
+              <MatchCard
+                key={match._id}
+                match={match}
+                favoriteTeams={favoriteTeams}
+                onToggleFavorite={toggleFavoriteTeam}
+              />
             ))}
           </div>
         </section>
@@ -127,8 +267,13 @@ function LiveMatches() {
             {hasLive ? "Recent Matches" : "Latest Matches"}
           </h2>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {recentMatches.slice(0, 12).map((match) => (
-              <MatchCard key={match._id} match={match} />
+            {filteredRecentMatches.slice(0, 12).map((match) => (
+              <MatchCard
+                key={match._id}
+                match={match}
+                favoriteTeams={favoriteTeams}
+                onToggleFavorite={toggleFavoriteTeam}
+              />
             ))}
           </div>
         </section>
