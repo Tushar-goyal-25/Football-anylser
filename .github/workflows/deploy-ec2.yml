@@ -65,28 +65,29 @@ jobs:
 
       - name: Setup SSH key
         run: |
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > /tmp/ec2-key.pem
-          chmod 400 /tmp/ec2-key.pem
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2-key.pem
+          chmod 600 ~/.ssh/ec2-key.pem
+
+          # Test SSH connection
+          ssh -i ~/.ssh/ec2-key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            ec2-user@${{ steps.get-ip.outputs.instance_ip }} "echo 'SSH connection successful'"
 
       - name: Copy services to EC2
         run: |
-          # Create .ssh directory and disable strict host checking for CI
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ steps.get-ip.outputs.instance_ip }} >> ~/.ssh/known_hosts
-
           # Copy producer service
-          rsync -avz -e "ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no" \
-            services/producer/ \
-            ec2-user@${{ steps.get-ip.outputs.instance_ip }}:/opt/epl-live/producer/
+          scp -i ~/.ssh/ec2-key.pem -o StrictHostKeyChecking=no -r \
+            services/producer \
+            ec2-user@${{ steps.get-ip.outputs.instance_ip }}:/opt/epl-live/
 
           # Copy consumer service
-          rsync -avz -e "ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no" \
-            services/consumer/ \
-            ec2-user@${{ steps.get-ip.outputs.instance_ip }}:/opt/epl-live/consumer/
+          scp -i ~/.ssh/ec2-key.pem -o StrictHostKeyChecking=no -r \
+            services/consumer \
+            ec2-user@${{ steps.get-ip.outputs.instance_ip }}:/opt/epl-live/
 
       - name: Restart Docker containers on EC2
         run: |
-          ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ steps.get-ip.outputs.instance_ip }} << 'EOF'
+          ssh -i ~/.ssh/ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ steps.get-ip.outputs.instance_ip }} << 'EOF'
             cd /opt/epl-live
 
             # Pull latest images and rebuild
@@ -108,7 +109,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          ssh -i /tmp/ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ steps.get-ip.outputs.instance_ip }} << 'EOF'
+          ssh -i ~/.ssh/ec2-key.pem -o StrictHostKeyChecking=no ec2-user@${{ steps.get-ip.outputs.instance_ip }} << 'EOF'
             # Check if all containers are running
             cd /opt/epl-live
 
@@ -131,7 +132,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -f /tmp/ec2-key.pem
+          rm -f ~/.ssh/ec2-key.pem
 
   # Notify deployment status
   notify:
