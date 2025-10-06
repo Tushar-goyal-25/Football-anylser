@@ -66,8 +66,12 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2-key.pem
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY_BASE64 }}" | base64 -d > ~/.ssh/ec2-key.pem
           chmod 600 ~/.ssh/ec2-key.pem
+
+          # Verify key format
+          echo "First line of key:"
+          head -n 1 ~/.ssh/ec2-key.pem
 
           # Test SSH connection
           ssh -i ~/.ssh/ec2-key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
