@@ -99,7 +99,9 @@ services:
       - epl-network
 
   producer:
-    image: python:3.12-slim
+    build:
+      context: ./producer
+      dockerfile: Dockerfile
     container_name: epl-producer
     depends_on:
       kafka:
@@ -112,20 +114,14 @@ services:
       - REDIS_URL=redis://redis:6379
       - FOOTBALL_API_KEY=$${FOOTBALL_API_KEY}
       - ENABLE_MOCK_DATA=$${ENABLE_MOCK_DATA:-false}
-    working_dir: /app
-    volumes:
-      - ./producer:/app
-    command: >
-      bash -c "
-        pip install --no-cache-dir -r requirements.txt &&
-        python -m app.main
-      "
     restart: unless-stopped
     networks:
       - epl-network
 
   consumer:
-    image: python:3.12-slim
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
     container_name: epl-consumer
     depends_on:
       kafka:
@@ -136,14 +132,6 @@ services:
       - KAFKA_GROUP_ID=epl-consumer-group
       - CONVEX_URL=$${CONVEX_URL}
       - CONVEX_DEPLOY_KEY=$${CONVEX_DEPLOY_KEY}
-    working_dir: /app
-    volumes:
-      - ./consumer:/app
-    command: >
-      bash -c "
-        pip install --no-cache-dir -r requirements.txt &&
-        python -m app.main
-      "
     restart: unless-stopped
     networks:
       - epl-network
