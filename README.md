@@ -1,348 +1,480 @@
-# Live EPL - Real-Time Premier League Data Pipeline & Dashboard
+# ⚽ EPL Live - Real-time English Premier League Match Tracker
 
-![Live EPL](https://img.shields.io/badge/status-MVP-green)
+A real-time data pipeline and analytics platform for English Premier League matches, featuring live match updates, team statistics, and intelligent caching.
+
+**🌐 Live Demo:** [https://epl-analysis-r3n13ort6-tushar-goyal-25s-projects.vercel.app](https://epl-analysis-r3n13ort6-tushar-goyal-25s-projects.vercel.app)
+
+![Status](https://img.shields.io/badge/status-Production-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+![Platform](https://img.shields.io/badge/platform-AWS%20EC2-orange)
 
-A production-ready real-time streaming pipeline that ingests live Premier League match data, processes it through Apache Kafka, stores it in AWS (DynamoDB + S3), and displays live updates in a Next.js dashboard with Clerk authentication.
+---
+
+## 📋 Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Deployment](#deployment)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Cost Breakdown](#cost-breakdown)
+- [Contributing](#contributing)
+
+---
+
+## ✨ Features
+
+### Frontend
+- 🎨 **Modern UI** - Beautiful, responsive design with dark mode support
+- ⚡ **Real-time Updates** - Live match scores and statistics via Convex
+- 🔍 **Smart Search** - Filter matches by team name
+- ⭐ **Favorite Teams** - Mark and filter your favorite teams
+- 📊 **Live Statistics** - Real-time match stats and KPIs
+- 🌙 **Dark Mode** - System preference detection with manual toggle
+
+### Backend
+- 🔄 **Event-Driven Architecture** - Apache Kafka for streaming match events
+- 🧠 **Adaptive Caching** - Smart Redis caching based on match state:
+  - Live matches: 30-second polling
+  - No live matches: 10-minute polling
+  - Finished matches: 24-hour cache
+- 📡 **Real-time Database** - Convex for instant frontend updates
+- 🚀 **Scalable Infrastructure** - AWS EC2 with auto-deployment
+
+---
 
 ## 🏗️ Architecture
 
 ```
-Public EPL API → FastAPI Producer → Kafka → Python Consumer → DynamoDB/S3
-                      ↓                                            ↓
-                 Docker Compose                              Convex Functions
-                                                                   ↓
-                                                        Next.js Dashboard + Clerk
+┌─────────────────────────────────────────────────────────────────┐
+│                         AWS EC2 Instance                         │
+│  ┌──────────────┐  ┌─────────────┐  ┌────────────┐             │
+│  │   Producer   │──│   Kafka     │──│  Consumer  │             │
+│  │ (API Fetch)  │  │ (Streaming) │  │ (Process)  │             │
+│  └──────┬───────┘  └─────────────┘  └─────┬──────┘             │
+│         │                                   │                    │
+│         │          ┌─────────────┐          │                    │
+│         └──────────│    Redis    │──────────┘                    │
+│                    │  (Caching)  │                               │
+│                    └─────────────┘                               │
+└──────────────────────────────────┬──────────────────────────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │     Convex      │
+                          │   (Database)    │
+                          └────────┬────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │   Next.js App   │
+                          │  (Frontend UI)  │
+                          └─────────────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │   Vercel CDN    │
+                          │  (Deployment)   │
+                          └─────────────────┘
 ```
 
-## 🚀 Tech Stack
+### Data Flow
 
-- **Streaming**: Apache Kafka (local: Docker Compose, prod: AWS MSK)
-- **Producer API**: FastAPI (Python)
-- **Consumer/Processing**: Python (aiokafka, async)
-- **Storage**: AWS DynamoDB (live data) + S3 (historical snapshots)
-- **Backend**: Convex (serverless functions)
-- **Frontend**: Next.js 15, shadcn/ui, TailwindCSS
-- **Auth**: Clerk
-- **Containerization**: Docker & Docker Compose
-- **Orchestration**: AWS ECS Fargate
-- **IaC**: Terraform (optional)
+1. **Producer** → Fetches match data from Football-Data.org API
+2. **Redis** → Caches finished matches and controls polling intervals
+3. **Kafka** → Streams match events in real-time
+4. **Consumer** → Processes events and writes to Convex
+5. **Convex** → Real-time database with automatic frontend sync
+6. **Next.js** → Displays live data to users via Vercel
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS
+- **UI Components:** Lucide React Icons
+- **Real-time Data:** Convex React Hooks
+- **Authentication:** Clerk
+- **Deployment:** Vercel
+- **Language:** TypeScript
+
+### Backend
+- **Runtime:** Python 3.12
+- **Message Broker:** Apache Kafka (Confluent Platform)
+- **Cache:** Redis 7
+- **Database:** Convex (Real-time)
+- **API:** Football-Data.org
+- **Containerization:** Docker & Docker Compose
+
+### Infrastructure
+- **Cloud Provider:** AWS
+- **Compute:** EC2 (t3.small)
+- **Storage:** EBS (30GB)
+- **Networking:** VPC, Security Groups, Elastic IP
+- **IaC:** Terraform
+- **CI/CD:** GitHub Actions
+
+---
 
 ## 📁 Project Structure
 
 ```
-live-epl/
-├── infra/
-│   ├── docker-compose.yml          # Local dev environment
-│   └── .env.example
-├── services/
-│   ├── producer/                   # FastAPI Kafka producer
+Football-analyser/
+├── epl-analysis/                  # Next.js Frontend
+│   ├── app/                       # Next.js 14 App Router
+│   │   ├── page.tsx              # Main dashboard
+│   │   └── globals.css           # Global styles
+│   ├── components/               # React components
+│   │   ├── MatchCard.tsx         # Match display card
+│   │   └── MatchStats.tsx        # Statistics component
+│   ├── convex/                   # Convex backend functions
+│   │   └── matches.ts            # Match queries/mutations
+│   └── public/                   # Static assets
+│
+├── services/                      # Backend Services
+│   ├── producer/                 # Data Producer
 │   │   ├── app/
-│   │   │   ├── main.py
-│   │   │   ├── producer.py
-│   │   │   └── api_client.py
+│   │   │   ├── main.py          # Producer entry point
+│   │   │   ├── api_client.py    # API client with caching
+│   │   │   ├── cache.py         # Redis cache logic
+│   │   │   └── kafka_producer.py # Kafka producer
 │   │   ├── Dockerfile
 │   │   └── requirements.txt
-│   └── consumer/                   # Kafka consumer
+│   │
+│   └── consumer/                 # Data Consumer
 │       ├── app/
-│       │   ├── consumer.py
-│       │   ├── transform.py
-│       │   └── storage.py
+│       │   ├── main.py          # Consumer entry point
+│       │   ├── kafka_consumer.py # Kafka consumer
+│       │   └── convex_client.py # Convex integration
 │       ├── Dockerfile
 │       └── requirements.txt
-├── frontend/
-│   ├── nextjs-app/                 # Next.js dashboard
-│   │   ├── app/
-│   │   ├── components/
-│   │   └── package.json
-│   └── convex-functions/           # Convex backend
-│       ├── convex/
-│       │   ├── schema.ts
-│       │   └── matches.ts
-│       └── package.json
-└── deployments/
-    ├── ecs-task-definitions/       # ECS task configs
-    ├── terraform/                  # Infrastructure as Code
-    └── DEPLOYMENT.md               # Deployment guide
+│
+├── infra/                        # Infrastructure
+│   ├── terraform-ec2/           # EC2 Deployment (Production)
+│   │   ├── main.tf              # Main Terraform config
+│   │   ├── ec2.tf               # EC2 instance
+│   │   ├── variables.tf         # Variables
+│   │   ├── outputs.tf           # Outputs
+│   │   ├── user-data.sh         # EC2 initialization script
+│   │   └── terraform.tfvars     # Configuration values
+│   │
+│   ├── docker-compose.yml       # Local development
+│   └── docker-compose.ec2.yml   # EC2 optimized config
+│
+├── .github/
+│   └── workflows/
+│       ├── deploy-ec2.yml       # EC2 CI/CD pipeline
+│       └── deploy-frontend.yml  # Vercel CI/CD pipeline
+│
+├── DEPLOYMENT-EC2.md            # EC2 deployment guide
+└── README.md                    # This file
 ```
-
-## 🎯 Features
-
-- ✅ Real-time EPL match data ingestion
-- ✅ Kafka-based event streaming
-- ✅ Live data processing and transformation
-- ✅ DynamoDB for low-latency reads
-- ✅ S3 for historical analytics
-- ✅ Real-time dashboard with Convex
-- ✅ User authentication with Clerk
-- ✅ Docker containerization
-- ✅ AWS deployment ready (MSK + ECS)
-
-## 🏃 Quick Start
-
-### Prerequisites
-
-- Docker & Docker Compose
-- Node.js 18+ (for frontend)
-- Python 3.12+ (for local development)
-- Football API key (optional, uses mock data without it)
-
-### Local Development
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd Football-analyser
-   ```
-
-2. **Set up environment variables**
-   ```bash
-   # Copy example env files
-   cp infra/.env.example infra/.env
-   cp services/producer/.env.example services/producer/.env
-   cp services/consumer/.env.example services/consumer/.env
-   ```
-
-3. **Get Football API key (optional)**
-   - Register at [Football-Data.org](https://www.football-data.org/client/register)
-   - Add to `infra/.env`: `FOOTBALL_API_KEY=your_key_here`
-   - Without a key, the system will use mock data
-
-4. **Start the backend services**
-   ```bash
-   cd infra
-   docker-compose up -d
-   ```
-
-   This starts:
-   - Zookeeper (port 2181)
-   - Kafka (port 9092)
-   - Kafka UI (port 8080) - View at http://localhost:8080
-   - Producer (port 8000) - API at http://localhost:8000
-   - Consumer
-
-5. **Setup Convex**
-   ```bash
-   cd frontend/convex-functions
-   npm install
-   npx convex dev
-   # Follow prompts to create/link Convex project
-   # Copy deployment URL
-   ```
-
-6. **Setup Clerk**
-   - Create account at [Clerk.dev](https://clerk.dev)
-   - Create new application
-   - Copy publishable key and secret key
-
-7. **Setup Next.js frontend**
-   ```bash
-   cd frontend/nextjs-app
-   npm install
-
-   # Create .env.local
-   cat > .env.local << EOF
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-   CLERK_SECRET_KEY=your_clerk_secret_key
-   NEXT_PUBLIC_CONVEX_URL=your_convex_deployment_url
-   EOF
-
-   npm run dev
-   ```
-
-8. **Access the dashboard**
-   - Frontend: http://localhost:3000
-   - Producer API: http://localhost:8000/docs
-   - Kafka UI: http://localhost:8080
-
-### Verify Data Flow
-
-1. Check producer logs:
-   ```bash
-   docker logs -f epl-producer
-   ```
-
-2. Check consumer logs:
-   ```bash
-   docker logs -f epl-consumer
-   ```
-
-3. View Kafka messages in Kafka UI: http://localhost:8080
-
-4. View live data in dashboard: http://localhost:3000
-
-## 🌐 Production Deployment
-
-See [DEPLOYMENT.md](deployments/DEPLOYMENT.md) for detailed AWS deployment instructions.
-
-### Quick Deploy Steps
-
-1. Setup AWS infrastructure (Terraform or manual)
-2. Create MSK cluster
-3. Build and push Docker images to ECR
-4. Deploy ECS services
-5. Configure Convex and Clerk
-6. Deploy Next.js to Vercel/Amplify
-
-## 📊 API Documentation
-
-### Producer API
-
-- `GET /` - Service info
-- `GET /health` - Health check
-- `GET /docs` - Swagger UI
-
-### Convex Functions
-
-- `getLiveMatches` - Get all live matches
-- `getAllMatches` - Get all matches
-- `getMatchById(matchId)` - Get specific match
-- `upsertMatch(...)` - Update match data
-
-## 🧪 Testing
-
-### Test Producer
-```bash
-curl http://localhost:8000/health
-```
-
-### Test Kafka
-View messages in Kafka UI or use:
-```bash
-docker exec -it epl-kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic epl.matches \
-  --from-beginning
-```
-
-### Test Consumer
-Check logs for processing confirmation:
-```bash
-docker logs epl-consumer
-```
-
-## 📈 Monitoring
-
-### Local Development
-- Kafka UI: http://localhost:8080
-- Producer logs: `docker logs epl-producer`
-- Consumer logs: `docker logs epl-consumer`
-
-### Production (AWS)
-- CloudWatch Logs: `/ecs/epl-producer`, `/ecs/epl-consumer`
-- CloudWatch Metrics: ECS, MSK, DynamoDB
-- Convex Dashboard: Real-time function metrics
-
-## 🔧 Configuration
-
-### Kafka Topics
-- `epl.matches` - Match events stream
-
-### Environment Variables
-
-**Producer**:
-- `KAFKA_BOOTSTRAP_SERVERS` - Kafka brokers
-- `KAFKA_TOPIC` - Topic name
-- `FOOTBALL_API_KEY` - Football API key
-
-**Consumer**:
-- `KAFKA_BOOTSTRAP_SERVERS` - Kafka brokers
-- `KAFKA_TOPIC` - Topic name
-- `KAFKA_GROUP_ID` - Consumer group
-- `DYNAMODB_TABLE` - DynamoDB table name
-- `S3_BUCKET` - S3 bucket name
-- `USE_LOCAL_MOCK` - Use mock storage (local dev)
-
-**Frontend**:
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk public key
-- `CLERK_SECRET_KEY` - Clerk secret
-- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL
-
-## 🛠️ Development
-
-### Add New Features
-
-1. **Add new event types**: Update `api_client.py` in producer
-2. **Add transformations**: Update `transform.py` in consumer
-3. **Add UI components**: Use shadcn/ui in `components/`
-4. **Add Convex functions**: Create in `convex-functions/convex/`
-
-### Code Style
-
-- Python: Follow PEP 8
-- TypeScript: ESLint + Prettier
-- Use async/await for I/O operations
-
-## 📝 Production Checklist
-
-- [ ] Add retries and exponential backoff for API calls
-- [ ] Add idempotency to producer events
-- [ ] Add schema validation (Pydantic) for events
-- [ ] Add unit tests & integration tests
-- [ ] Add IAM least privilege for ECS tasks
-- [ ] Enable encryption at rest (S3, DynamoDB)
-- [ ] Enable TLS in transit
-- [ ] Add autoscaling rules for ECS tasks
-- [ ] Set up CloudWatch alarms
-- [ ] Configure S3 lifecycle policies
-
-## 🐛 Troubleshooting
-
-### Producer not fetching data
-- Check API key in `.env`
-- Verify API rate limits
-- Check logs: `docker logs epl-producer`
-
-### Consumer not processing
-- Verify Kafka connectivity
-- Check consumer group status in Kafka UI
-- Check logs: `docker logs epl-consumer`
-
-### Frontend not showing data
-- Verify Convex deployment URL
-- Check Clerk authentication setup
-- Check browser console for errors
-
-## 📚 Resources
-
-- [Football-Data.org API](https://www.football-data.org/documentation)
-- [Apache Kafka Docs](https://kafka.apache.org/documentation/)
-- [AWS MSK Docs](https://docs.aws.amazon.com/msk/)
-- [Convex Docs](https://docs.convex.dev/)
-- [Clerk Docs](https://clerk.dev/docs)
-- [Next.js Docs](https://nextjs.org/docs)
-- [shadcn/ui](https://ui.shadcn.com/)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🙋 Support
-
-For issues and questions:
-- Check [Troubleshooting](#-troubleshooting) section
-- Open an issue on GitHub
-- Check CloudWatch logs for production issues
-
-## 🎯 Roadmap
-
-- [ ] Add more EPL statistics (possession, shots, cards)
-- [ ] Add match predictions/analytics
-- [ ] Add historical data analysis
-- [ ] Add email/SMS alerts for goals
-- [ ] Add mobile app (React Native)
-- [ ] Add GraphQL API layer
-- [ ] Add Apache Spark for batch processing
 
 ---
 
-**Built with ⚽ for football fans and data engineers**
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 20+
+- **Python** 3.12+
+- **Docker** & Docker Compose
+- **AWS Account** (for deployment)
+- **Football-Data.org API Key** ([Get one free](https://www.football-data.org/))
+- **Convex Account** ([Sign up free](https://convex.dev))
+
+### Local Development
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/Football-analyser.git
+cd Football-analyser
+```
+
+#### 2. Setup Frontend
+
+```bash
+cd epl-analysis
+
+# Install dependencies
+npm install
+
+# Setup Convex
+npx convex dev
+
+# Create .env.local
+cat > .env.local << EOF
+CONVEX_DEPLOYMENT=dev:your-deployment-name
+NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-key
+CLERK_SECRET_KEY=your-clerk-secret
+EOF
+
+# Start development server
+npm run dev
+```
+
+Frontend runs at: http://localhost:3000
+
+#### 3. Setup Backend Services
+
+```bash
+cd infra
+
+# Create .env file
+cat > .env << EOF
+FOOTBALL_API_KEY=your-api-key
+CONVEX_URL=https://your-deployment.convex.cloud
+ENABLE_MOCK_DATA=false
+EOF
+
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+Services running:
+- Kafka: `localhost:9092`
+- Redis: `localhost:6379`
+- Kafka UI: http://localhost:8080
+
+---
+
+## 🌐 Deployment
+
+### AWS EC2 Deployment ($0-17/month)
+
+Complete guide: [DEPLOYMENT-EC2.md](DEPLOYMENT-EC2.md)
+
+**Quick Start:**
+
+```bash
+# 1. Create SSH key
+aws ec2 create-key-pair \
+  --key-name epl-live-key \
+  --query 'KeyMaterial' \
+  --output text > ~/.ssh/epl-live-key.pem
+chmod 400 ~/.ssh/epl-live-key.pem
+
+# 2. Deploy infrastructure
+cd infra/terraform-ec2
+terraform init
+terraform apply
+
+# 3. Copy services
+INSTANCE_IP=$(terraform output -raw instance_public_ip)
+scp -i ~/.ssh/epl-live-key.pem -r ../../services/producer ec2-user@$INSTANCE_IP:/opt/epl-live/
+scp -i ~/.ssh/epl-live-key.pem -r ../../services/consumer ec2-user@$INSTANCE_IP:/opt/epl-live/
+
+# 4. Start services
+ssh -i ~/.ssh/epl-live-key.pem ec2-user@$INSTANCE_IP
+cd /opt/epl-live
+docker-compose build
+docker-compose up -d
+```
+
+### Frontend Deployment (Vercel)
+
+```bash
+cd epl-analysis
+
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel --prod
+```
+
+---
+
+## 🔄 CI/CD Pipeline
+
+### Backend (EC2) - Automated on Push
+
+Workflow: `.github/workflows/deploy-ec2.yml`
+
+1. ✅ **Lint & Test** - Python code quality checks
+2. ✅ **Get EC2 IP** - Automatically find instance
+3. ✅ **Copy Services** - Deploy producer/consumer code
+4. ✅ **Restart Containers** - Build and restart Docker services
+5. ✅ **Verify Deployment** - Health checks
+
+**GitHub Secrets Required:**
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `EC2_SSH_PRIVATE_KEY_BASE64`
+
+### Frontend (Vercel) - Automated on Push
+
+Workflow: `.github/workflows/deploy-frontend.yml`
+
+1. ✅ **Lint & Type Check** - ESLint and TypeScript validation
+2. ✅ **Build** - Next.js production build
+3. ✅ **Deploy** - Deploy to Vercel CDN
+
+**GitHub Secrets Required:**
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+---
+
+## 💰 Cost Breakdown
+
+### Production Deployment
+
+| Service | Configuration | Monthly Cost |
+|---------|--------------|--------------|
+| **EC2 Instance** | t3.small (2 vCPU, 2GB RAM) | $15.00 |
+| **EBS Storage** | 30GB gp3 | $2.40 |
+| **Elastic IP** | (while instance running) | $0.00 |
+| **Data Transfer** | ~10GB/month | $0.00 (free tier) |
+| **Vercel** | Hobby plan | $0.00 |
+| **Convex** | Free tier | $0.00 |
+| **GitHub Actions** | Public repo | $0.00 |
+| **Total** | | **~$17/month** |
+
+**Free Tier Benefits:**
+- First 12 months: **t3.micro FREE** (then $7/month)
+- 30GB EBS storage: FREE
+- 100GB data transfer: FREE
+
+---
+
+## 📊 Key Features
+
+### Adaptive Caching Strategy
+
+The system intelligently adjusts API polling based on match state:
+
+```python
+# Live matches (IN_PLAY)
+poll_interval = 30 seconds
+
+# No live matches
+poll_interval = 10 minutes
+
+# Finished matches
+cache_duration = 24 hours
+```
+
+**Benefits:**
+- ✅ Reduces API calls by 95-99%
+- ✅ Stays within free tier (10 calls/minute)
+- ✅ Real-time updates when needed
+
+### Real-time Architecture
+
+**Convex Real-time Database:**
+- Automatic frontend sync (no polling needed)
+- Optimistic updates
+- Built-in caching
+- TypeScript type safety
+
+**Kafka Event Streaming:**
+- Decoupled producer/consumer
+- Guaranteed message delivery
+- Scalable architecture
+- Event replay capability
+
+---
+
+## 🔧 Environment Variables
+
+### Frontend (.env.local)
+
+```bash
+NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+```
+
+### Backend (infra/.env)
+
+```bash
+FOOTBALL_API_KEY=your-api-key
+CONVEX_URL=https://your-deployment.convex.cloud
+ENABLE_MOCK_DATA=false
+```
+
+### Terraform (infra/terraform-ec2/terraform.tfvars)
+
+```hcl
+aws_region          = "us-east-1"
+instance_type       = "t3.small"
+ssh_key_name        = "epl-live-key"
+football_api_key    = "your-api-key"
+convex_url          = "https://your-deployment.convex.cloud"
+allowed_ssh_cidr    = ["0.0.0.0/0"]
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Frontend Issues
+
+**Deployment fails on Vercel:**
+```bash
+npm run build  # Check for errors locally
+```
+
+**No data showing:**
+```bash
+npx convex dev  # Verify Convex connection
+```
+
+### Backend Issues
+
+**Services not starting:**
+```bash
+docker-compose logs producer
+docker-compose logs consumer
+docker-compose down && docker-compose build --no-cache && docker-compose up -d
+```
+
+**Kafka connection errors:**
+```bash
+docker-compose ps
+docker exec epl-kafka kafka-topics --list --bootstrap-server localhost:9092
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Football-Data.org** - Free EPL match data API
+- **Convex** - Real-time database platform
+- **Vercel** - Frontend hosting and deployment
+- **Confluent** - Kafka Docker images
+
+---
+
+**Built with ❤️ for EPL fans worldwide**
+
+⭐ Star this repo if you find it useful!
